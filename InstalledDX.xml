@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Template srcFolder="Windows;Shared">
+  <Var name="platform" value="Windows" hidden="true"/>
+  <Var name="projectName" value="MyProject" type="projectName" />
+  <Var name="organization" type="organization" />
+
+  <File src="MonoGameWindowsApplication.csproj" dst="{{projectName}}.csproj" />
+  <File src="Program.cs" />
+  <File src="Game1.cs" />
+  <File src="Properties/AssemblyInfo.cs" />
+  <File src="app.manifest" />
+  <File src="Content/Content.mgcb" />
+  <File src="Icon.ico" raw="true" />
+</Template>
+

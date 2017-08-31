@@ -7,27 +7,42 @@ using System.Xml.Linq;
 
 namespace MGPG
 {
-    internal class Template
+    public class Template
     {
-        private const string SourceFolderAttrib = "srcFolder";
+        private const string NameElement = "Name";
+        private const string DescriptionElement = "Description";
+        private const string IconElement = "Icon";
+        private const string PreviewImageElement = "PreviewImage";
+        private const string SourceFolderElement = "SrcFolder";
         private const string VariableElement = "Var";
+        private const string ProjectElement = "Project";
         private const string FileElement = "File";
         private const string NameAttrib = "name";
         private const string ValueAttrib = "value";
+        private const string TypeAttrib = "type";
         private const string SourceAttrib = "src";
         private const string DestinationAttrib = "dst";
         private const string RawAttrib = "raw";
 
         public bool HasFatalError { get; private set; }
 
-        public VariableCollection Variables { get; }
-        public List<FileEntry> FileEntries { get; }
+        public string FullPath { get; }
+        public string Name { get; private set; }
+        public string Description { get; private set; }
+        public string Icon { get; private set; }
+        public string PreviewImage { get; private set; }
 
-        public Template(string path, Logger logger)
+        public VariableCollection Variables { get; }
+        public Dictionary<string, string> VariableTypes { get; }
+        public List<ProjectEntry> ProjectEntries;
+
+        public Template(string fullPath, Logger logger)
         {
+            FullPath = fullPath;
             Variables = new VariableCollection();
-            FileEntries = new List<FileEntry>();
-            Create(path, logger);
+            VariableTypes = new Dictionary<string, string>();
+            ProjectEntries = new List<ProjectEntry>();
+            Create(fullPath, logger);
         }
 
         private void Create(string path, Logger logger)
@@ -41,15 +56,19 @@ namespace MGPG
                 return;
             }
 
+            Name = te.Element(NameElement)?.Value;
+            Description = te.Element(DescriptionElement)?.Value;
+            Icon = te.Element(IconElement)?.Value;
+            PreviewImage = te.Element(PreviewImageElement)?.Value;
+
             IEnumerable<string> srcDirs;
-            if (te.Attribute(SourceFolderAttrib) == null)
+            if (te.Element(SourceFolderElement) == null)
             {
-                srcDirs = new[] {Path.GetDirectoryName(path)};
+                srcDirs = new[] {string.Empty};
             }
             else
             {
-                var relativeSrcs = te.Attribute(SourceFolderAttrib).Value.Split(new[] {';'}, StringSplitOptions.RemoveEmptyEntries);
-                srcDirs = relativeSrcs.Select(s => Path.Combine(Path.GetDirectoryName(path), s));
+                srcDirs = te.Elements(SourceFolderElement).Select(s => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path), s.Value)));
             }
 
             logger.Log(LogLevel.Info, path, te, $"Using source folders '{srcDirs.Aggregate((s1, s2) => string.Join(", ", s1, s2))}'");
@@ -72,69 +91,81 @@ namespace MGPG
                 if (name == null)
                     logger.Log(LogLevel.Warning, path, ve, $"Variable is missing '{NameAttrib}' attribute.");
                 else
+                {
                     Variables.Set(name, value);
+                    var ta = ve.Attribute(TypeAttrib);
+                    if (ta != null)
+                        VariableTypes.Add(name, ta.Value);
+                }
             }
 
-            var projectPaths = new List<string>();
-
-            foreach (var fe in te.Elements(FileElement))
+            foreach (var pe in te.Elements(ProjectElement))
             {
-                var rsrc = fe.Attribute(SourceAttrib)?.Value;
-                if (string.IsNullOrEmpty(rsrc))
-                {
-                    logger.Log(LogLevel.Error, path, fe, "File elements must at least have a src attribute.");
-                    continue;
-                }
-                var asrc = srcDirs.Select(s => Path.Combine(s, rsrc)).FirstOrDefault(File.Exists);
-                if (asrc == null)
-                {
-                    logger.Log(LogLevel.Error, path, fe.Attribute(SourceAttrib), $"Source file '{rsrc}' not found.");
-                    continue;
-                }
+                var project = ParseFileEntry(path, pe, srcDirs, logger);
 
-                // default to same relative path as source file for destination
-                if (fe.Attribute(DestinationAttrib) == null && Path.IsPathRooted(rsrc))
-                {
-                    logger.Log(LogLevel.Error, path, fe,
-                        "Destination path is not set; defaulting to same relative path as source, but source is rooted.");
-                    continue;
-                }
-                var rdst = fe.Attribute(DestinationAttrib)?.Value ?? rsrc;
-                /*fdst = Path.GetFullPath(Path.Combine(dst, fdst));
+                var fes = pe.Elements(FileElement)
+                    .Select(fe => ParseFileEntry(path, fe, srcDirs, logger))
+                    .Where(file => file != null)
+                    .ToList();
 
-                if (File.Exists(fdst))
-                {
-                    logger.Log(LogLevel.Error,
-                        path, fe.Attribute(DestinationAttrib) ?? fe.Attribute(SourceAttrib),
-                        $"Tried to render file to '{fdst}', but file exists. Check the template file for duplicate dst attributes.");
-                    continue;
-                }*/
+                ProjectEntries.Add(new ProjectEntry(project, fes));
+            }
+        }
 
-                var rawstr = fe.Attribute(RawAttrib)?.Value;
-                // raw defaults to false
-                var raw = rawstr != null && Util.IsTrue(rawstr);
-                FileEntries.Add(new FileEntry(asrc, rdst, raw, ((IXmlLineInfo)fe).LineNumber, ((IXmlLineInfo)fe).LinePosition));
+        private static FileEntry ParseFileEntry(string templatePath, XElement element, IEnumerable<string> srcDirs, Logger logger)
+        {
+            var rawsrc = element.Attribute(SourceAttrib)?.Value;
+            if (string.IsNullOrEmpty(rawsrc) || Path.IsPathRooted(rawsrc))
+            {
+                logger.Log(LogLevel.Error, templatePath, element, "File elements must at least have a src attribute which may not be a rooted path.");
+                return null;
+            }
+            var rsrc = srcDirs.Select(s => Path.Combine(s, rawsrc)).FirstOrDefault(File.Exists);
+            if (rsrc == null)
+            {
+                logger.Log(LogLevel.Error, templatePath, element.Attribute(SourceAttrib),
+                    $"Source file '{element.Attribute(SourceAttrib).Value}' not found.");
+                return null;
             }
 
+            var rdst = element.Attribute(DestinationAttrib)?.Value ?? rawsrc;
+
+            var asrc = Path.Combine(Path.GetDirectoryName(templatePath), rsrc);
+            var rawstr = element.Attribute(RawAttrib)?.Value;
+            // raw defaults to false
+            var raw = rawstr != null && Util.IsTrue(rawstr);
+            return new FileEntry(rawsrc, asrc, rdst, raw, ((IXmlLineInfo) element).LineNumber, ((IXmlLineInfo) element).LinePosition);
         }
     }
 
-    internal class FileEntry
+    public class FileEntry
     {
-        public string Source { get; }
-        public string Destination { get; }
+        public string Rsrc { get; }
+        public string Asrc { get; }
+        public string Rdst { get; }
         public bool Raw { get; }
         public int Line { get; }
         public int Column { get; }
 
-        public FileEntry(string source, string destination, bool raw, int line, int column)
+        public FileEntry(string rsrc, string asrc, string rdst, bool raw, int line, int column)
         {
-            Source = source;
-            Destination = destination;
+            Rsrc = rsrc;
+            Asrc = asrc;
+            Rdst = rdst;
             Raw = raw;
             Line = line;
             Column = column;
         }
-
     }
+
+    public class ProjectEntry : FileEntry
+    {
+        public List<FileEntry> FileEntries { get; }
+        public ProjectEntry(FileEntry fe, List<FileEntry> fileEntries)
+            : base(fe.Rsrc, fe.Asrc, fe.Rdst, fe.Raw, fe.Line, fe.Column)
+        {
+            FileEntries = fileEntries;
+        }
+    }
+
 }

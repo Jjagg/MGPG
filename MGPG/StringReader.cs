@@ -38,7 +38,6 @@ namespace MGPG
                 throw new ArgumentOutOfRangeException(nameof(Position), "Position is larger than Source length.");
             var c = Source[Position];
             Position++;
-            // TODO \r and stuff
             if (c == '\n')
             {
                 Column = 0;

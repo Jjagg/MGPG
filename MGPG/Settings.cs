@@ -4,14 +4,13 @@
 
 using System;
 using System.IO;
-using System.Linq;
 
 namespace MGPG
 {
     public class Settings
     {
         /// <summary>
-        /// Set this flag to run the generator even when the <see cref="DestinationFolder"/> exists and is not empty.
+        /// Set this flag to run the generator even when the destination folder exists and is not empty.
         /// </summary>
         public bool Overwrite { get; set; }
 
@@ -33,7 +32,7 @@ namespace MGPG
         public Settings()
         {
             SupressErrors = false;
-            LogLevel = LogLevel.Info;
+            LogLevel = LogLevel.Warning;
         }
    }
 }

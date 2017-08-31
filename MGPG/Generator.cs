@@ -7,8 +7,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Xml;
-using System.Xml.Linq;
 using Microsoft.DotNet.Cli.Sln.Internal;
 using Microsoft.DotNet.Tools.Common;
 
@@ -67,42 +65,17 @@ namespace MGPG
 
             var variables = template.Variables.With(arguments.Variables);
 
-            var projectPaths = new List<string>();
-
             Directory.CreateDirectory(dst);
-            foreach (var fe in template.FileEntries)
+            var projectPaths = new List<string>();
+            foreach (var pe in template.ProjectEntries)
             {
-                try
-                {
-                    logger.Log(LogLevel.Info, $"Writing {fe.Source} to {fe.Destination}");
-                    var asrc = fe.Source;
-                    var rdst = RenderString(templatePath, fe.Destination, variables, logger, fe.Line, fe.Column);
-                    var adst = Path.Combine(dst, rdst);
-
-                    var dir = Path.GetDirectoryName(adst);
-                    if (!Directory.Exists(dir))
-                        Directory.CreateDirectory(dir);
-                    if (fe.Raw)
-                    {
-                        File.Copy(fe.Source, adst);
-                    }
-                    else
-                    {
-                        var text = File.ReadAllText(asrc);
-                        var rendered = RenderString(asrc, text, template.Variables, logger);
-                        File.WriteAllText(adst, rendered);
-                    }
-                    Render?.Invoke(this, new RenderEventArgs(asrc, adst));
-                    if (Path.GetExtension(adst).Equals(".csproj"))
-                        projectPaths.Add(adst);
-                }
-                catch (Exception e)
-                {
-                    logger.Log(LogLevel.Error, $"Error rendering {fe.Source}:\n        {e.Message}");
-                }
+                var adst = RenderFileEntry(pe, templatePath, variables, dst, template, logger);
+                projectPaths.Add(adst);
+                foreach (var fe in pe.FileEntries)
+                    RenderFileEntry(fe, templatePath, variables, dst, template, logger);
             }
 
-            if (arguments.Solution != null && projectPaths.Any())
+            if (arguments.Solution != null)
             {
                 var slnPath = Path.GetFullPath(arguments.Solution);
                 SlnFile sln;
@@ -119,6 +92,46 @@ namespace MGPG
                 foreach (var projectPath in projectPaths)
                     sln.AddProject(projectPath);
                 sln.Write();
+            }
+        }
+
+        private string RenderFileEntry(FileEntry fe, string templatePath, VariableCollection variables, string dst, Template template, Logger logger)
+        {
+            try
+            {
+                logger.Log(LogLevel.Info, $"Writing {fe.Asrc} to {fe.Rdst}");
+                var asrc = fe.Asrc;
+                var rdst = RenderString(templatePath, fe.Rdst, variables, logger, fe.Line, fe.Column);
+                var adst = Path.Combine(dst, rdst);
+
+                if (File.Exists(adst))
+                {
+                    logger.Log(LogLevel.Warning,
+                        templatePath, fe.Line, fe.Column,
+                        $"Tried to render file to '{adst}', but file exists. Check the template file for duplicate dst attributes.");
+                    return null;
+                }
+
+                var dir = Path.GetDirectoryName(adst);
+                if (!Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                if (fe.Raw)
+                {
+                    File.Copy(fe.Asrc, adst, true);
+                }
+                else
+                {
+                    var text = File.ReadAllText(asrc);
+                    var rendered = RenderString(asrc, text, template.Variables, logger);
+                    File.WriteAllText(adst, rendered);
+                }
+                Render?.Invoke(this, new RenderEventArgs(asrc, adst));
+                return adst;
+            }
+            catch (Exception e)
+            {
+                logger.Log(LogLevel.Error, $"Error rendering {fe.Asrc}:\n        {e.Message}");
+                return null;
             }
         }
 

@@ -73,10 +73,12 @@
     <Compile Include="RenderEventArgs.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="StringReader.cs" />
-    <Compile Include="IdeTemplateCreator.cs" />
+    <Compile Include="IdeTemplateWriters\IdeTemplateWriter.cs" />
     <Compile Include="Template.cs" />
+    <Compile Include="IdeTemplateWriters\VirtualFileSystem.cs" />
     <Compile Include="Util.cs" />
     <Compile Include="VariableCollection.cs" />
+    <Compile Include="IdeTemplateWriters\VsTemplateWriter.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

@@ -20,5 +20,9 @@
     <File src="Content/Content.mgcb" />
     <File src="Icon.ico" raw="true" />
   </Project>
+
+  <!-- .vstemplate specific data -->
+  <VSTemplateData element="SortOrder">43100</VSTemplateData>
+
 </Template>
 

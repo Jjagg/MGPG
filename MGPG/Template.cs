@@ -34,6 +34,9 @@ namespace MGPG
         private const string DestinationAttrib = "dst";
         private const string RawAttrib = "raw";
 
+        private const string VsTemplateDataElement = "VSTemplateData";
+        private const string ElementAttrib = "element";
+
         public bool HasFatalError { get; private set; }
 
         public string FullPath { get; }
@@ -47,6 +50,7 @@ namespace MGPG
         public string Directory => Path.GetDirectoryName(FullPath);
 
         public List<ProjectEntry> ProjectEntries;
+        public List<XElement> VsTemplateDataElements;
 
         public Template(string fullPath, Logger logger)
         {
@@ -128,6 +132,19 @@ namespace MGPG
                     .ToList();
 
                 ProjectEntries.Add(new ProjectEntry(project, fes));
+            }
+
+            VsTemplateDataElements = new List<XElement>();
+            foreach (var tde in te.Elements(VsTemplateDataElement))
+            {
+                var element = tde.Attribute(ElementAttrib)?.Value;
+                if (element == null)
+                {
+                    logger.Log(LogLevel.Error, FullPath, tde.Attribute(ElementAttrib), "VSTemplateData elements need an 'attrib' attribute.");
+                    continue;
+                }
+                var value = tde.Value;
+                VsTemplateDataElements.Add(new XElement(element, value));
             }
         }
 

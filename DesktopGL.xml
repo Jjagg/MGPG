@@ -21,5 +21,7 @@
     <File src="Icon.ico" raw="true" />
     <File src="Icon.bmp" raw="true" />
   </Project>
+
+  <VSTemplateData element="SortOrder">43300</VSTemplateData>
 </Template>
 

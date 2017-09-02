@@ -3,7 +3,6 @@
 // file 'LICENSE.txt', which is part of this source code package.
 
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -86,20 +85,27 @@ namespace MGPG.IdeTemplateWriters
             var ns = XNamespace.Get("http://schemas.microsoft.com/developer/vstemplate/2005");
             var pes = template.ProjectEntries.Select(e => ToVsElement(e, ns));
 
+            var templateData = new XElement(ns + "TemplateData",
+                new XElement(ns + "Name", template.Name),
+                new XElement(ns + "Description", template.Description),
+                new XElement(ns + "ProjectType", sl.ToString()),
+                new XElement(ns + "SortOrder", 1000),
+                new XElement(ns + "NumberOfParentCategoriesToRollUp", 1),
+                new XElement(ns + "DefaultName", "Game"),
+                new XElement(ns + "Icon", Path.GetFileName(template.Icon)),
+                new XElement(ns + "PreviewImage", Path.GetFileName(template.PreviewImage)));
+
+            foreach (var tde in template.VsTemplateDataElements)
+            {
+                tde.Name = ns + tde.Name.LocalName;
+                templateData.Add(tde);
+            }
+
             var xdoc = new XDocument(
                 new XElement(ns + "VSTemplate",
                   new XAttribute("Version", "3.0.0"),
                   new XAttribute("Type", "Project"),
-                  
-                  new XElement(ns + "TemplateData",
-                    new XElement(ns + "Name", template.Name),
-                    new XElement(ns + "Description", template.Description),
-                    new XElement(ns + "ProjectType", sl.ToString()),
-                    new XElement(ns + "NumberOfParentCategoriesToRollUp", 1),
-                    new XElement(ns + "DefaultName", "Game"),
-                    new XElement(ns + "Icon", Path.GetFileName(template.Icon)),
-                    new XElement(ns + "PreviewImage", Path.GetFileName(template.PreviewImage))
-                  ),
+                  templateData,
                   new XElement(ns + "TemplateContent", pes)
                 )
             );

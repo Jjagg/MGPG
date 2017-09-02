@@ -46,7 +46,7 @@ namespace MGPG
             var c = Source[Position];
             Position++;
 
-            if (c == '\n')
+            if (c == '\n' || (c == '\r' && (Eof || Source[Position] != '\n')))
             {
                 Column = 0;
                 Line++;

@@ -1,4 +1,8 @@
-﻿using System;
+﻿// MonoGame - Copyright (C) The MonoGame Team
+// This file is subject to the terms and conditions defined in
+// file 'LICENSE.txt', which is part of this source code package.
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,7 +13,7 @@ namespace MGPG.IdeTemplateWriters
 {
     public class VsTemplateWriter : IdeTemplateWriter
     {
-        public override void WriteIdeTemplate(Template template, string outputFolder, Logger logger)
+        public override void WriteIdeTemplate(Template template, string outputFolder, VariableCollection variables, SourceLanguage sl, Logger logger)
         {
             if (template.ProjectEntries.Count > 1)
             {
@@ -24,12 +28,28 @@ namespace MGPG.IdeTemplateWriters
 
             foreach (var pe in template.ProjectEntries)
             {
-                var pfile = new VfsFile(pe) {FilePath = pe.Rsrc};
+                var psrc = pe.PossibleRawSrcPaths.Select(s => RenderString(template, s, logger, ref guidNr, pe.Line, pe.Column)).FirstOrDefault(File.Exists);
+                if (psrc == null)
+                {
+                    logger.Log(LogLevel.Error, template.FullPath, pe.Line, pe.Column,
+                        $"Project source file '{pe.RawRelativeSrc}' not found.");
+                    continue;
+                }
+                pe.AbsoluteSrc = psrc;
+                var pfile = new VfsFile(pe) {FilePath = RenderString(template, pe.RawRelativeSrc, logger, ref guidNr, pe.Line, pe.Column)};
                 rootDir.Add(pfile);
 
                 foreach (var fe in pe.FileEntries)
                 {
-                    var file = new VfsFile(fe) {FilePath = fe.Rsrc};
+                    var fsrc = fe.PossibleRawSrcPaths.Select(s => RenderString(template, s, logger, ref guidNr, fe.Line, fe.Column)).FirstOrDefault(File.Exists);
+                    if (fsrc == null)
+                    {
+                        logger.Log(LogLevel.Error, template.FullPath, fe.Line, fe.Column,
+                            $"Source file '{fe.RawRelativeSrc}' not found.");
+                        continue;
+                    }
+                    fe.AbsoluteSrc = fsrc;
+                    var file = new VfsFile(fe) {FilePath = RenderString(template, fe.RawRelativeSrc, logger, ref guidNr, fe.Line, fe.Column)};
                     rootDir.Add(file);
                 }
             }
@@ -39,16 +59,29 @@ namespace MGPG.IdeTemplateWriters
                 {
                     if (fe.Raw)
                     {
-                        File.Copy(fe.Asrc, path, true);
+                        File.Copy(fe.AbsoluteSrc, path, true);
                     }
                     else
                     {
-                        var content = File.ReadAllText(fe.Asrc);
+                        var content = File.ReadAllText(fe.AbsoluteSrc);
                         content = RenderString(template, content, logger, ref guidNr);
                         File.WriteAllText(path, content);
                     }
                 }
             );
+
+            if (template.Icon != null)
+            {
+                var iconSrc = Path.Combine(template.Directory, template.Icon);
+                var iconDst = Path.Combine(outputFolder, Path.GetFileName(template.Icon));
+                File.Copy(iconSrc, iconDst, true);
+            }
+            if (template.PreviewImage != null)
+            {
+                var piSrc = Path.Combine(template.Directory, template.PreviewImage);
+                var piDst = Path.Combine(outputFolder, Path.GetFileName(template.PreviewImage));
+                File.Copy(piSrc, piDst, true);
+            }
 
             var ns = XNamespace.Get("http://schemas.microsoft.com/developer/vstemplate/2005");
             var pes = template.ProjectEntries.Select(e => ToVsElement(e, ns));
@@ -61,14 +94,9 @@ namespace MGPG.IdeTemplateWriters
                   new XElement(ns + "TemplateData",
                     new XElement(ns + "Name", template.Name),
                     new XElement(ns + "Description", template.Description),
-                    new XElement(ns + "ProjectType", "CSharp"),
+                    new XElement(ns + "ProjectType", sl.ToString()),
                     new XElement(ns + "NumberOfParentCategoriesToRollUp", 1),
-                    new XElement(ns + "SortOrder", 43100),
-                    new XElement(ns + "CreateNewFolder", true),
                     new XElement(ns + "DefaultName", "Game"),
-                    new XElement(ns + "ProvideDefaultName", true),
-                    new XElement(ns + "LocationField", "Enabled"),
-                    new XElement(ns + "EnableLocationBrowseButton", true),
                     new XElement(ns + "Icon", Path.GetFileName(template.Icon)),
                     new XElement(ns + "PreviewImage", Path.GetFileName(template.PreviewImage))
                   ),
@@ -89,7 +117,10 @@ namespace MGPG.IdeTemplateWriters
                 var col = sr.Column + colOffset;
                 string varName;
                 if (!sr.ReadTo("}}", out varName))
+                {
                     logger.Log(LogLevel.Error, template.FullPath, line, col, "No matching block end.");
+                    return null;
+                }
 
                 varName = varName.Trim();
                 if (varName[0] == '#')
@@ -110,27 +141,37 @@ namespace MGPG.IdeTemplateWriters
                 }
                 else
                 {
-                    string type;
-                    sb.Append(template.VariableTypes.TryGetValue(varName, out type)
-                        ? $"${ToVsReservedVariable(type)}$"
-                        : template.Variables.Get(varName));
+                    var vdata = template.Variables.Get(varName);
+                    if (vdata == null)
+                    {
+                        logger.Log(LogLevel.Error, template.FullPath, line, col, $"Variable {varName} does not exist");
+                        continue;
+                    }
+                    var value = vdata.HasSemantic
+                        ? ToVsReservedVariable(vdata.Semantic, logger)
+                        : template.Variables.Get(varName).Value;
+                    sb.Append(value);
                 }
             }
 
             return sb.ToString();
         }
 
-        private string ToVsReservedVariable(string type)
+        private string ToVsReservedVariable(string semantic, Logger logger)
         {
-            switch (type)
+            string varName;
+            switch (semantic)
             {
                 case "projectName":
-                    return "safeprojectname";
+                    varName = "safeprojectname";
+                    break;
                 case "organization":
-                    return "registeredorganization";
+                    varName = "registeredorganization";
+                    break;
                 default:
-                    throw new ArgumentException("Unknown variable type");
+                    throw new ArgumentException("Unknown variable semantic");
             }
+            return $"${varName}$";
         }
 
         private static XElement ToVsElement(VfsFileSystemEntry e, XNamespace ns)
@@ -160,7 +201,7 @@ namespace MGPG.IdeTemplateWriters
         private static XElement ToVsElement(FileEntry fe, XNamespace ns)
         {
             XElement xe;
-            var name = Path.GetFileName(fe.Rsrc);
+            var name = Path.GetFileName(fe.AbsoluteSrc);
             if (fe is ProjectEntry)
             {
                 xe = new XElement(ns + "Project");

@@ -1,4 +1,8 @@
-﻿using System;
+﻿// MonoGame - Copyright (C) The MonoGame Team
+// This file is subject to the terms and conditions defined in
+// file 'LICENSE.txt', which is part of this source code package.
+
+using System;
 using System.IO;
 using System.Linq;
 
@@ -6,7 +10,7 @@ namespace MGPG.IdeTemplateWriters
 {
     public abstract class IdeTemplateWriter
     {
-        public void Write(string templateFile, string outputFolder, Settings settings)
+        public void Write(string templateFile, string outputFolder, VariableCollection variables, SourceLanguage sl, Settings settings)
         {
             var logger = new Logger
             {
@@ -32,9 +36,9 @@ namespace MGPG.IdeTemplateWriters
                 return;
 
             outputFolder = Path.GetFullPath(outputFolder);
-            WriteIdeTemplate(template, outputFolder, logger);
+            WriteIdeTemplate(template, outputFolder, variables, sl, logger);
         }
 
-        public abstract void WriteIdeTemplate(Template template, string outputFolder, Logger logger);
+        public abstract void WriteIdeTemplate(Template template, string outputFolder, VariableCollection variables, SourceLanguage sl, Logger logger);
     }
 }

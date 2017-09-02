@@ -1,4 +1,8 @@
-﻿using System;
+﻿// MonoGame - Copyright (C) The MonoGame Team
+// This file is subject to the terms and conditions defined in
+// file 'LICENSE.txt', which is part of this source code package.
+
+using System;
 using System.IO;
 using System.Xml;
 
@@ -37,15 +41,18 @@ namespace MGPG
         {
             if (level >= LogLevel.Error && !SupressErrors)
                 throw new GeneratorException(message, fileName, line, column);
-            Log(level, $"{fileName} -> Ln {line}, Col {column}: {message}");
+            var lvlString = $"[{level}]".PadRight("[Warning] ".Length);
+            //Log(level, $"{fileName} -> Ln {line}, Col {column}:\n{new string(' ', lvlString.Length)}{message}");
+            Log(level, $"{fileName} -> Ln {line}:\n{new string(' ', lvlString.Length)}{message}");
         }
 
         public void Log(LogLevel level, string msg)
         {
             if (level >= LogLevel.Error && !SupressErrors)
                 throw new GeneratorException(msg);
+            var lvlString = $"[{level}]".PadRight("[Warning] ".Length);
             if (level >= LogLevel)
-                LogWriter.WriteLine($"[{level}] {msg}");
+                LogWriter.WriteLine($"{lvlString}{msg}");
         }
     }
 }

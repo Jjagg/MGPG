@@ -1,6 +1,6 @@
-﻿using System;
+using System;
 
-namespace {{ projectName }}
+namespace {{projectName}}
 {
 #if WINDOWS || LINUX
     /// <summary>

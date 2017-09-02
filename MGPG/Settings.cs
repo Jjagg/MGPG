@@ -32,7 +32,7 @@ namespace MGPG
         public Settings()
         {
             SupressErrors = false;
-            LogLevel = LogLevel.Warning;
+            LogLevel = LogLevel.Info;
         }
    }
 }

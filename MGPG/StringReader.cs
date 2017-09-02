@@ -1,13 +1,19 @@
-﻿using System;
+﻿// MonoGame - Copyright (C) The MonoGame Team
+// This file is subject to the terms and conditions defined in
+// file 'LICENSE.txt', which is part of this source code package.
+
+using System;
+using System.Globalization;
 using System.Text;
 
 namespace MGPG
 {
     public class StringReader
     {
-        private StringBuilder _sb;
+        private readonly StringBuilder _sb;
 
         private int _position;
+        private TextElementEnumerator _srcEnumerator;
         public string Source { get; }
         public int Line { get; private set; }
         public int Column { get; private set; }
@@ -30,14 +36,16 @@ namespace MGPG
             Source = source;
             Position = 0;
             _sb = new StringBuilder();
+            _srcEnumerator = StringInfo.GetTextElementEnumerator(source);
         }
 
         public char Read()
         {
-            if (Position >= Source.Length)
+            if (Eof)
                 throw new ArgumentOutOfRangeException(nameof(Position), "Position is larger than Source length.");
             var c = Source[Position];
             Position++;
+
             if (c == '\n')
             {
                 Column = 0;
@@ -53,9 +61,9 @@ namespace MGPG
         public bool ReadTo(char c, out string value)
         {
             var sb = GetStringBuilder();
-            ReadTo(c, sb);
+            var ret = ReadTo(c, sb);
             value = sb.ToString();
-            return !Eof;
+            return ret;
         }
 
         public bool ReadTo(char c, StringBuilder sb)
@@ -73,9 +81,9 @@ namespace MGPG
         public bool ReadTo(string s, out string value, StringComparison comparisonType = StringComparison.OrdinalIgnoreCase)
         {
             var sb = GetStringBuilder();
-            ReadTo(s, sb, comparisonType);
+            var ret = ReadTo(s, sb, comparisonType);
             value = sb.ToString();
-            return !Eof;
+            return ret;
         }
 
         public bool ReadTo(string c, StringBuilder sb, StringComparison comparisonType = StringComparison.OrdinalIgnoreCase)
@@ -83,7 +91,8 @@ namespace MGPG
             var len = c.Length;
             while (!Eof)
             {
-                sb.Append(Read());
+                var ch = Read();
+                sb.Append(ch);
                 if (Position - len >= 0 && string.Equals(Source.Substring(Position - len, len), c, comparisonType))
                 {
                     // remove the matching string
@@ -91,7 +100,7 @@ namespace MGPG
                     return true;
                 }
             }
-            return !Eof;
+            return false;
         }
 
         private StringBuilder GetStringBuilder()

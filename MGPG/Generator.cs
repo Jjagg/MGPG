@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Microsoft.Build.Construction;
 using Microsoft.DotNet.Cli.Sln.Internal;
 using Microsoft.DotNet.Tools.Common;
 
@@ -17,6 +18,7 @@ namespace MGPG
     /// </summary>
     public class Generator
     {
+
         /// <summary>
         /// Get or set the configuration of this <see cref="Generator"/>.
         /// </summary>
@@ -64,15 +66,20 @@ namespace MGPG
                 return;
 
             var variables = template.Variables.With(arguments.Variables);
+            variables.Set(Template.SourceFileExtensionVariable, arguments.SourceLanguage.GetFileExtension());
 
             Directory.CreateDirectory(dst);
             var projectPaths = new List<string>();
             foreach (var pe in template.ProjectEntries)
             {
                 var adst = RenderFileEntry(pe, templatePath, variables, dst, template, logger);
+                logger.Log(LogLevel.Info, $"Rendered project '{pe.AbsoluteSrc}' to '{adst}'.");
                 projectPaths.Add(adst);
                 foreach (var fe in pe.FileEntries)
-                    RenderFileEntry(fe, templatePath, variables, dst, template, logger);
+                {
+                    adst = RenderFileEntry(fe, templatePath, variables, dst, template, logger);
+                    logger.Log(LogLevel.Info, $"Rendered file '{fe.AbsoluteSrc}' to '{adst}'.");
+                }
             }
 
             if (arguments.Solution != null)
@@ -88,9 +95,13 @@ namespace MGPG
                     sln = new SlnFile {FullPath = slnPath};
                     sln.FormatVersion = "12.00";
                     sln.MinimumVisualStudioVersion = "10.0.40219.1";
+                    logger.Log(LogLevel.Info, $"Created solution '{Path.GetFileName(slnPath)}'.");
                 }
                 foreach (var projectPath in projectPaths)
+                {
                     sln.AddProject(projectPath);
+                    logger.Log(LogLevel.Info, $"Added project '{Path.GetFileName(projectPath)}' to solution '{Path.GetFileName(slnPath)}'.");
+                }
                 sln.Write();
             }
         }
@@ -99,11 +110,18 @@ namespace MGPG
         {
             try
             {
-                logger.Log(LogLevel.Info, $"Writing {fe.Asrc} to {fe.Rdst}");
-                var asrc = fe.Asrc;
-                var rdst = RenderString(templatePath, fe.Rdst, variables, logger, fe.Line, fe.Column);
-                var adst = Path.Combine(dst, rdst);
+                logger.Log(LogLevel.Verbose, $"Looking for {fe.RawRelativeSrc} at {fe.PossibleRawSrcPaths.Aggregate((s1, s2) => string.Join(", ", s1, s2))}");
+                var asrc = fe.PossibleRawSrcPaths.Select(s => RenderString(templatePath, s, variables, logger, fe.Line, fe.Column)).FirstOrDefault(File.Exists);
+                if (asrc == null)
+                {
+                    logger.Log(LogLevel.Error, templatePath, fe.Line, fe.Column,
+                        $"Source file '{fe.RawRelativeSrc}' not found.");
+                    return null;
+                }
+                logger.Log(LogLevel.Info, $"Rendering file '{asrc}'");
+                fe.AbsoluteSrc = asrc;
 
+                var adst = Path.Combine(dst, RenderString(templatePath, fe.RawRelativeDst, variables, logger, fe.Line, fe.Column));
                 if (File.Exists(adst))
                 {
                     logger.Log(LogLevel.Warning,
@@ -117,7 +135,7 @@ namespace MGPG
                     Directory.CreateDirectory(dir);
                 if (fe.Raw)
                 {
-                    File.Copy(fe.Asrc, adst, true);
+                    File.Copy(asrc, adst, true);
                 }
                 else
                 {
@@ -130,7 +148,7 @@ namespace MGPG
             }
             catch (Exception e)
             {
-                logger.Log(LogLevel.Error, $"Error rendering {fe.Asrc}:\n        {e.Message}");
+                logger.Log(LogLevel.Error, $"Error rendering '{fe.AbsoluteSrc ?? fe.RawRelativeSrc}':\n        {e.Message}");
                 return null;
             }
         }
@@ -151,7 +169,7 @@ namespace MGPG
                 varName = varName.Trim();
                 if (varName[0] == '#')
                 {
-                    // TODO if-then support etc.
+                    // TODO if-then support
                     switch (varName.Substring(1))
                     {
                         case "newGuid":
@@ -170,12 +188,21 @@ namespace MGPG
                 else
                 {
                     // it's a variable, replace it with its value
-                    var value = vars.Get(varName);
-                    if (value == null)
+                    var vdata = vars.Get(varName);
+                    if (vdata == null)
+                    {
+                        logger.Log(LogLevel.Error, fileName, line, col, $"Variable '{varName}' does not exist.");
+                        continue;
+                    }
+                    if (string.IsNullOrEmpty(vdata.Value))
+                    {
                         logger.Log(LogLevel.Warning, fileName, line, col, $"Variable '{varName}' not set.");
+                    }
                     else
-                        logger.Log(LogLevel.Verbose, fileName, line, col, $"Replaced variable '{varName}' with '{value}'.");
-                    sb.Append(value);
+                    {
+                        logger.Log(LogLevel.Verbose, fileName, line, col, $"Replaced variable '{varName}' with '{vdata.Value}'.");
+                        sb.Append(vdata.Value);
+                    }
                 }
             }
 

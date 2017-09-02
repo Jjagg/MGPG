@@ -1,4 +1,9 @@
-﻿using System.IO;
+﻿// MonoGame - Copyright (C) The MonoGame Team
+// This file is subject to the terms and conditions defined in
+// file 'LICENSE.txt', which is part of this source code package.
+
+using System.Collections.Generic;
+using System.IO;
 
 namespace MGPG
 {
@@ -24,11 +29,14 @@ namespace MGPG
         /// </summary>
         public string Solution { get; set; }
 
-        public VariableCollection Variables { get; }
+        public Dictionary<string, string> Variables { get; set; }
+
+        public SourceLanguage SourceLanguage { get; set; }
 
         public GeneratorArguments()
         {
-            Variables = new VariableCollection();
+            Variables = new Dictionary<string, string>();
+            SourceLanguage = SourceLanguage.CSharp;
         }
     }
 }

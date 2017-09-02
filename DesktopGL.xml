@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Template>
+  <SrcFolder>DesktopGL</SrcFolder>
+  <SrcFolder>Desktop</SrcFolder>
+  <SrcFolder>Shared</SrcFolder>
+  <Name>MonoGame Cross Platform Desktop Project</Name>
+  <Icon>DesktopGL/__TemplateIcon.png</Icon>
+  <PreviewImage>DesktopGL/__PreviewImage.png</PreviewImage>
+  <Description>A MonoGame game project for Windows, Mac and Linux using OpenGL.</Description>
+
+  <Var name="platform" hidden="true">DesktopGL</Var>
+  <Var name="projectName" semantic="projectName">MyProject</Var>
+  <Var name="organization" semantic="organization" />
+
+  <Project src="MonoGameDesktopGLApplication.{{_sourceExt}}proj" dst="{{projectName}}.{{_sourceExt}}proj">
+    <File src="Program.{{_sourceExt}}" />
+    <File src="Game1.{{_sourceExt}}" />
+    <File src="Properties/AssemblyInfo.{{_sourceExt}}" />
+    <File src="app.manifest" />
+    <File src="Content/Content.mgcb" />
+    <File src="Icon.ico" raw="true" />
+    <File src="Icon.bmp" raw="true" />
+  </Project>
+</Template>
+

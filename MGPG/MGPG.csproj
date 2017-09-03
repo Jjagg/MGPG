@@ -71,12 +71,9 @@
     <Compile Include="Settings.cs" />
     <Compile Include="SourceLanguage.cs" />
     <Compile Include="StringReader.cs" />
-    <Compile Include="IdeTemplateWriters\IdeTemplateWriter.cs" />
     <Compile Include="Template.cs" />
-    <Compile Include="IdeTemplateWriters\VirtualFileSystem.cs" />
     <Compile Include="Util.cs" />
     <Compile Include="VariableCollection.cs" />
-    <Compile Include="IdeTemplateWriters\VsTemplateWriter.cs" />
     <Compile Include="VariableSemantics.cs" />
   </ItemGroup>
   <ItemGroup>

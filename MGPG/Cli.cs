@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using MGPG.IdeTemplateWriters;
 
 namespace MGPG
 {
@@ -27,26 +26,6 @@ namespace MGPG
                 Console.WriteLine();
                 WriteTemplateData(t);
                 Environment.Exit(0);
-            }
-
-            if (string.Equals(args[0], "--vs", StringComparison.OrdinalIgnoreCase))
-            {
-                if (args.Length < 3)
-                {
-                    PrintHelp();
-                    Environment.Exit(1);
-                }
-
-                var relativeTemplatePath = args[1];
-                var outputFolder = args[2];
-
-                var templatePath = Path.GetFullPath(relativeTemplatePath);
-                var logger = new Logger();
-                var t = new Template(templatePath, logger);
-                var variables = t.Variables.With(ParseVariables(args, 3));
-                var vsTemplateWriter = new VsTemplateWriter();
-                vsTemplateWriter.WriteIdeTemplate(t, outputFolder, variables, SourceLanguage.CSharp, logger);
-                return;
             }
 
             var tmpl = args[0];

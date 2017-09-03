@@ -158,7 +158,7 @@ namespace Microsoft.DotNet.Tools.Common
                         var solutionFolder = new SlnProject
                         {
                             Id = Guid.NewGuid().ToString("B").ToUpper(),
-                            TypeGuid = ProjectTypeGuids.SolutionFolderGuid,
+                            TypeGuid = ProjectTypeGuid.SolutionFolderGuid,
                             Name = dir,
                             FilePath = dir
                         };
@@ -183,7 +183,7 @@ namespace Microsoft.DotNet.Tools.Common
         {
             var solutionFolderPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            var solutionFolderProjects = slnFile.Projects.GetProjectsByType(ProjectTypeGuids.SolutionFolderGuid);
+            var solutionFolderProjects = slnFile.Projects.GetProjectsByType(ProjectTypeGuid.SolutionFolderGuid);
             foreach (var slnProject in solutionFolderProjects)
             {
                 var path = slnProject.FilePath;
@@ -270,7 +270,7 @@ namespace Microsoft.DotNet.Tools.Common
         public static void RemoveEmptySolutionFolders(this SlnFile slnFile)
         {
             var solutionFolderProjects = slnFile.Projects
-                .GetProjectsByType(ProjectTypeGuids.SolutionFolderGuid)
+                .GetProjectsByType(ProjectTypeGuid.SolutionFolderGuid)
                 .ToList();
 
             if (solutionFolderProjects.Any())
@@ -321,7 +321,7 @@ namespace Microsoft.DotNet.Tools.Common
             var solutionFoldersInUse = new HashSet<string>();
 
             var nonSolutionFolderProjects = slnFile.Projects.GetProjectsNotOfType(
-                ProjectTypeGuids.SolutionFolderGuid);
+                ProjectTypeGuid.SolutionFolderGuid);
 
             foreach (var nonSolutionFolderProject in nonSolutionFolderProjects)
             {

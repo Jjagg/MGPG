@@ -40,7 +40,7 @@ namespace Microsoft.DotNet.Tools.Common
                 //when we cannot find ProjectTypeGuid or DefaultProjectTypeGuid. But for now we
                 //need to default to the C# one.
                 //throw new GracefulException(CommonLocalizableStrings.UnsupportedProjectType);
-                projectTypeGuid = ProjectTypeGuids.CSharpProjectTypeGuid;
+                projectTypeGuid = ProjectTypeGuid.CSharpProjectTypeGuid;
             }
 
             return projectTypeGuid;

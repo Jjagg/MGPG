@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using MGPG.IdeTemplateWriters;
 
 namespace MGPG
@@ -57,12 +56,11 @@ namespace MGPG
             var varIndex = sln == null ? 2 : 3;
             var vars = ParseVariables(args, varIndex);
 
-            var g = new Generator();
+            var g = new Generator(tmpl);
 
             var generatorArgs = new GeneratorArguments
             {
                 DestinationFolder = dst,
-                TemplateFile = tmpl,
                 Solution = sln,
                 Variables = vars
             };

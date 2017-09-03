@@ -9,13 +9,6 @@ namespace MGPG
 {
     public class GeneratorArguments
     {
-        /// <summary>
-        /// Path to the file that describes the template to generate.
-        /// </summary>
-        /// <remarks>
-        /// TODO something about the file format and an example.
-        /// </remarks>
-        public string TemplateFile { get; set; }
 
         /// <summary>
         /// The folder in which to place the rendered files.

@@ -7,31 +7,41 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Microsoft.Build.Construction;
 using Microsoft.DotNet.Cli.Sln.Internal;
 using Microsoft.DotNet.Tools.Common;
 
 namespace MGPG
 {
     /// <summary>
-    /// Core class that generates the template when <see cref="Generate"/> is called.
+    /// Core class that generates a project from a template when <see cref="Generate"/> is called.
     /// </summary>
     public class Generator
     {
+        private readonly Template _template;
+        private Logger _logger;
 
         /// <summary>
         /// Get or set the configuration of this <see cref="Generator"/>.
         /// </summary>
         public Settings Settings { get; set; }
 
-        public event EventHandler<RenderEventArgs> Render;
+        /// <summary>
+        /// Invoked when a file is written to disk after a succesful render or copy operation.
+        /// </summary>
+        public event EventHandler<RenderEventArgs> FileWritten;
 
         /// <summary>
         /// Create a <see cref="Generator"/> with default <see cref="MGPG.Settings"/>.
         /// </summary>
-        public Generator()
+        /// <param name="templatePath">Path to the file that describes the template to generate.</param>
+        public Generator(string templatePath)
         {
             Settings = new Settings();
+
+            if (!File.Exists(templatePath))
+                throw new ArgumentException($"Template file not found at '{templatePath}'.", nameof(templatePath));
+            templatePath = Path.GetFullPath(templatePath);
+            _template = new Template(templatePath, _logger);
         }
 
         /// <summary>
@@ -39,46 +49,41 @@ namespace MGPG
         /// </summary>
         public void Generate(GeneratorArguments arguments)
         {
-            var logger = new Logger
+            _logger = new Logger
             {
                 LogLevel = Settings.LogLevel,
                 LogWriter = Settings.LogWriter ?? Console.Out,
                 SupressErrors = Settings.SupressErrors
             };
+            if (_template == null)
+                return;
 
             if (File.Exists(arguments.DestinationFolder) ||
                 (Directory.Exists(arguments.DestinationFolder) && Directory.EnumerateFileSystemEntries(arguments.DestinationFolder).Any() && !Settings.Overwrite))
             {
-                logger.Log(LogLevel.Error, $"The destination directory '{arguments.DestinationFolder}' already exists and is not empty. Set the Overwrite flag to write anyway.");
-                return;
-            }
-            if (!File.Exists(arguments.TemplateFile))
-            {
-                logger.Log(LogLevel.Error, $"Template file not found at '{arguments.TemplateFile}'.");
+                _logger.Log(LogLevel.Error, $"The destination directory '{arguments.DestinationFolder}' already exists and is not empty. Set the Overwrite flag to write anyway.");
                 return;
             }
 
             var dst = Path.GetFullPath(arguments.DestinationFolder);
-            var templatePath = Path.GetFullPath(arguments.TemplateFile);
 
-            var template = new Template(templatePath, logger);
-            if (template.HasFatalError)
+            if (_template.HasFatalError)
                 return;
 
-            var variables = template.Variables.With(arguments.Variables);
+            var variables = _template.Variables.With(arguments.Variables);
             variables.Set(Template.SourceFileExtensionVariable, arguments.SourceLanguage.GetFileExtension());
 
             Directory.CreateDirectory(dst);
             var projectPaths = new List<string>();
-            foreach (var pe in template.ProjectEntries)
+            foreach (var pe in _template.ProjectEntries)
             {
-                var adst = RenderFileEntry(pe, templatePath, variables, dst, template, logger);
-                logger.Log(LogLevel.Info, $"Rendered project '{pe.AbsoluteSrc}' to '{adst}'.");
+                var adst = RenderFileEntry(pe, variables, dst);
+                _logger.Log(LogLevel.Info, $"Rendered project '{pe.AbsoluteSrc}' to '{adst}'.");
                 projectPaths.Add(adst);
                 foreach (var fe in pe.FileEntries)
                 {
-                    adst = RenderFileEntry(fe, templatePath, variables, dst, template, logger);
-                    logger.Log(LogLevel.Info, $"Rendered file '{fe.AbsoluteSrc}' to '{adst}'.");
+                    adst = RenderFileEntry(fe, variables, dst);
+                    _logger.Log(LogLevel.Info, $"Rendered file '{fe.AbsoluteSrc}' to '{adst}'.");
                 }
             }
 
@@ -95,37 +100,36 @@ namespace MGPG
                     sln = new SlnFile {FullPath = slnPath};
                     sln.FormatVersion = "12.00";
                     sln.MinimumVisualStudioVersion = "10.0.40219.1";
-                    logger.Log(LogLevel.Info, $"Created solution '{Path.GetFileName(slnPath)}'.");
+                    _logger.Log(LogLevel.Info, $"Created solution '{Path.GetFileName(slnPath)}'.");
                 }
                 foreach (var projectPath in projectPaths)
                 {
                     sln.AddProject(projectPath);
-                    logger.Log(LogLevel.Info, $"Added project '{Path.GetFileName(projectPath)}' to solution '{Path.GetFileName(slnPath)}'.");
+                    _logger.Log(LogLevel.Info, $"Added project '{Path.GetFileName(projectPath)}' to solution '{Path.GetFileName(slnPath)}'.");
                 }
                 sln.Write();
             }
         }
 
-        private string RenderFileEntry(FileEntry fe, string templatePath, VariableCollection variables, string dst, Template template, Logger logger)
+        private string RenderFileEntry(FileEntry fe, VariableCollection variables, string dst)
         {
             try
             {
-                logger.Log(LogLevel.Verbose, $"Looking for {fe.RawRelativeSrc} at {fe.PossibleRawSrcPaths.Aggregate((s1, s2) => string.Join(", ", s1, s2))}");
-                var asrc = fe.PossibleRawSrcPaths.Select(s => RenderString(templatePath, s, variables, logger, fe.Line, fe.Column)).FirstOrDefault(File.Exists);
+                _logger.Log(LogLevel.Verbose, $"Looking for {fe.RawRelativeSrc} at {fe.PossibleRawSrcPaths.Aggregate((s1, s2) => string.Join(", ", s1, s2))}");
+                var asrc = fe.PossibleRawSrcPaths.Select(s => RenderString(_template.FullPath, s, variables, fe.Line, fe.Column)).FirstOrDefault(File.Exists);
                 if (asrc == null)
                 {
-                    logger.Log(LogLevel.Error, templatePath, fe.Line, fe.Column,
+                    _logger.Log(LogLevel.Error, _template.FullPath, fe.Line, fe.Column,
                         $"Source file '{fe.RawRelativeSrc}' not found.");
                     return null;
                 }
-                logger.Log(LogLevel.Info, $"Rendering file '{asrc}'");
                 fe.AbsoluteSrc = asrc;
 
-                var adst = Path.Combine(dst, RenderString(templatePath, fe.RawRelativeDst, variables, logger, fe.Line, fe.Column));
+                var adst = Path.Combine(dst, RenderString(_template.FullPath, fe.RawRelativeDst, variables, fe.Line, fe.Column));
                 if (File.Exists(adst))
                 {
-                    logger.Log(LogLevel.Warning,
-                        templatePath, fe.Line, fe.Column,
+                    _logger.Log(LogLevel.Warning,
+                        _template.FullPath, fe.Line, fe.Column,
                         $"Tried to render file to '{adst}', but file exists. Check the template file for duplicate dst attributes.");
                     return null;
                 }
@@ -135,25 +139,28 @@ namespace MGPG
                     Directory.CreateDirectory(dir);
                 if (fe.Raw)
                 {
+                    _logger.Log(LogLevel.Info, $"Copying file '{asrc}' to '{adst}'.");
                     File.Copy(asrc, adst, true);
                 }
                 else
                 {
+                    _logger.Log(LogLevel.Info, $"Rendering file '{asrc}'.");
                     var text = File.ReadAllText(asrc);
-                    var rendered = RenderString(asrc, text, template.Variables, logger);
+                    var rendered = RenderString(asrc, text, variables);
+                    _logger.Log(LogLevel.Verbose, $"Writing file '{asrc}' to '{adst}'.");
                     File.WriteAllText(adst, rendered);
                 }
-                Render?.Invoke(this, new RenderEventArgs(asrc, adst));
+                FileWritten?.Invoke(this, new RenderEventArgs(asrc, adst));
                 return adst;
             }
             catch (Exception e)
             {
-                logger.Log(LogLevel.Error, $"Error rendering '{fe.AbsoluteSrc ?? fe.RawRelativeSrc}':\n        {e.Message}");
+                _logger.Log(LogLevel.Error, $"Error rendering '{fe.AbsoluteSrc ?? fe.RawRelativeSrc}':\n        {e.Message}");
                 return null;
             }
         }
 
-        public static string RenderString(string fileName, string src, VariableCollection vars, Logger logger, int lineOffset = 0, int colOffset = 0)
+        public string RenderString(string fileName, string src, VariableCollection vars, int lineOffset = 0, int colOffset = 0)
         {
             var sb = new StringBuilder();
 
@@ -164,7 +171,7 @@ namespace MGPG
                 var col = sr.Column + colOffset;
                 string varName;
                 if (!sr.ReadTo("}}", out varName))
-                    logger.Log(LogLevel.Error, fileName, line, col, "No matching block end.");
+                    _logger.Log(LogLevel.Error, fileName, line, col, "No matching block end.");
 
                 varName = varName.Trim();
                 if (varName[0] == '#')
@@ -174,14 +181,14 @@ namespace MGPG
                     {
                         case "newGuid":
                             var guid = Guid.NewGuid();
-                            logger.Log(LogLevel.Verbose, fileName, line, col, $"Generated Guid '{guid}'.");
+                            _logger.Log(LogLevel.Verbose, fileName, line, col, $"Generated Guid '{guid}'.");
                             sb.Append(guid);
                             break;
                         case "year":
                             sb.Append(DateTime.Today.Year);
                             break;
                         default:
-                            logger.Log(LogLevel.Warning, fileName, line, col, $"Unknown function '{varName}'.");
+                            _logger.Log(LogLevel.Warning, fileName, line, col, $"Unknown function '{varName}'.");
                             break;
                     }
                 }
@@ -191,16 +198,16 @@ namespace MGPG
                     var vdata = vars.Get(varName);
                     if (vdata == null)
                     {
-                        logger.Log(LogLevel.Error, fileName, line, col, $"Variable '{varName}' does not exist.");
+                        _logger.Log(LogLevel.Error, fileName, line, col, $"Variable '{varName}' does not exist.");
                         continue;
                     }
                     if (string.IsNullOrEmpty(vdata.Value))
                     {
-                        logger.Log(LogLevel.Warning, fileName, line, col, $"Variable '{varName}' not set.");
+                        _logger.Log(LogLevel.Warning, fileName, line, col, $"Variable '{varName}' not set.");
                     }
                     else
                     {
-                        logger.Log(LogLevel.Verbose, fileName, line, col, $"Replaced variable '{varName}' with '{vdata.Value}'.");
+                        _logger.Log(LogLevel.Verbose, fileName, line, col, $"Replaced variable '{varName}' with '{vdata.Value}'.");
                         sb.Append(vdata.Value);
                     }
                 }

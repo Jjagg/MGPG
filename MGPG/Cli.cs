@@ -22,7 +22,7 @@ namespace MGPG
             var exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             tmpl = Path.Combine(exeDir, tmpl);
 
-            if (args.Length == 0)
+            if (args.Length == 0 || (args.Length == 1 && (args[0] == "--help" || args[0] == "-h")))
             {
                 PrintHelp();
                 Environment.Exit(1);
@@ -103,7 +103,6 @@ namespace MGPG
         {
             Console.WriteLine("Usage: MGPG <template>");
             Console.WriteLine("       MGPG <template> <destinationDir> [<solution>] (<key>:<value> )*");
-            Console.WriteLine("       MGPG --<IDE> <template> <output> (<key>:<value> )*");
         }
     }
 }

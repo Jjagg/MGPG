@@ -5,10 +5,10 @@ MGPG is a simple, lightweight tool to generate projects from templates.
 ## CLI
 
 MGPG offers a simple command-line interface (CLI). The CLI offers two function
-1. Print information about a template. Usage: `MGPG <template>`
-2. Generate a project from a template. 
-Usage: `MGPG <template> <destinationDir> [<solution>] (<variable>:<value> )*`
-If the solution does not exist it will be created. After generating a project it will be added to the solution.
+- Print information about a template. <br> Usage: `MGPG <template>`
+- Generate a project from a template. <br>
+Usage: `MGPG <template> <destinationDir> [<solution>] (<variable>:<value> )*` <br>
+If the solution does not exist it will be created. Generated projects will be added to the solution.
 
 ## Template Format Specification
 

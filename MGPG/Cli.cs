@@ -4,8 +4,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace MGPG
 {
@@ -13,6 +15,13 @@ namespace MGPG
     {
         private static void Main(string[] args)
         {
+            var tmpl = args[0];
+            if (!Path.HasExtension(tmpl))
+                tmpl += ".xml";
+            // the template path argument is relative to the MGPG executable
+            var exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            tmpl = Path.Combine(exeDir, tmpl);
+
             if (args.Length == 0)
             {
                 PrintHelp();
@@ -20,15 +29,13 @@ namespace MGPG
             }
             if (args.Length == 1)
             {
-                var templatePath = Path.GetFullPath(args[0]);
                 var logger = new Logger {LogLevel = LogLevel.Warning};
-                var t = new Template(templatePath, logger);
+                var t = new Template(tmpl, logger);
                 Console.WriteLine();
                 WriteTemplateData(t);
                 Environment.Exit(0);
             }
 
-            var tmpl = args[0];
             var dst = args[1];
             var sln = args.Length >= 3  && args[2].EndsWith(".sln") ? args[2] : null;
 

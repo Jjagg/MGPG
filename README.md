@@ -19,10 +19,6 @@ The root element is [Template](#template).
 
 The template element is the root element of a template specification.
 
-#### Attributes
-
-None.
-
 #### Child Elements
 
 | Name                            | Required | Multiple | Notes             |

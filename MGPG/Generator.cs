@@ -17,7 +17,7 @@ namespace MGPG
     /// </summary>
     public class Generator
     {
-        private readonly Template _template;
+        private Template _template;
         private Logger _logger;
 
         /// <summary>
@@ -31,12 +31,25 @@ namespace MGPG
         public event EventHandler<RenderEventArgs> FileWritten;
 
         /// <summary>
-        /// Create a <see cref="Generator"/> with default <see cref="MGPG.Settings"/>.
+        /// Create a <see cref="Generator"/>.
         /// </summary>
-        /// <param name="templatePath">Path to the file that describes the template to generate.</param>
-        public Generator(string templatePath)
+        public Generator()
         {
             Settings = new Settings();
+        }
+
+        /// <summary>
+        /// Create a <see cref="Generator"/>.
+        /// </summary>
+        /// <param name="templatePath">Path to the file that describes the template to generate.</param>
+        public void LoadTemplate(string templatePath)
+        {
+            _logger = new Logger
+            {
+                LogLevel = Settings.LogLevel,
+                LogWriter = Settings.LogWriter ?? Console.Out,
+                SupressErrors = Settings.SupressErrors
+            };
 
             if (!File.Exists(templatePath))
                 throw new ArgumentException($"Template file not found at '{templatePath}'.", nameof(templatePath));
@@ -55,8 +68,12 @@ namespace MGPG
                 LogWriter = Settings.LogWriter ?? Console.Out,
                 SupressErrors = Settings.SupressErrors
             };
+
             if (_template == null)
+            {
+                _logger.Log(LogLevel.Error, "A template needs to be loaded before calling generate.");
                 return;
+            }
 
             if (File.Exists(arguments.DestinationFolder) ||
                 (Directory.Exists(arguments.DestinationFolder) && Directory.EnumerateFileSystemEntries(arguments.DestinationFolder).Any() && !Settings.Overwrite))

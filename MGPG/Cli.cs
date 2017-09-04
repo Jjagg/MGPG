@@ -42,7 +42,8 @@ namespace MGPG
             var varIndex = sln == null ? 2 : 3;
             var vars = ParseVariables(args, varIndex);
 
-            var g = new Generator(tmpl);
+            var g = new Generator();
+            g.LoadTemplate(tmpl);
 
             var generatorArgs = new GeneratorArguments
             {

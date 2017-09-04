@@ -4,7 +4,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -15,12 +14,16 @@ namespace MGPG
     {
         private static void Main(string[] args)
         {
-            var tmpl = args[0];
-            if (!Path.HasExtension(tmpl))
-                tmpl += ".xml";
-            // the template path argument is relative to the MGPG executable
-            var exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            tmpl = Path.Combine(exeDir, tmpl);
+            string tmpl = null;
+            if (args.Length > 0)
+            {
+                tmpl = args[0];
+                if (!Path.HasExtension(tmpl))
+                    tmpl += ".xml";
+                // the template path argument is relative to the MGPG executable
+                var exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                tmpl = Path.Combine(exeDir, tmpl);
+            }
 
             if (args.Length == 0 || (args.Length == 1 && (args[0] == "--help" || args[0] == "-h")))
             {
@@ -57,7 +60,10 @@ namespace MGPG
 
         private static void WriteTemplateData(Template template)
         {
-            Console.WriteLine($"Template '{template.Name}' variables:");
+            Console.WriteLine($"Name:        {template.Name}");
+            Console.WriteLine($"Description: {template.Description}");
+            Console.WriteLine();
+            Console.WriteLine("Variables:");
             Console.WriteLine();
 
             const int spacing = 4;
@@ -95,7 +101,7 @@ namespace MGPG
                 else if (kv.Length == 2)
                     vars[kv[0]] = kv[1];
                 else
-                    Console.WriteLine($"Wrong format '{args[varIndex]}'; should be <Key>:<Value>.");
+                    Console.WriteLine($"Wrong format '{args[varIndex]}'; should be <variable>:<value>.");
             }
             return vars;
         }
@@ -103,7 +109,7 @@ namespace MGPG
         public static void PrintHelp()
         {
             Console.WriteLine("Usage: MGPG <template>");
-            Console.WriteLine("       MGPG <template> <destinationDir> [<solution>] (<key>:<value> )*");
+            Console.WriteLine("       MGPG <template> <destinationDir> [<solution>] (<variable>:<value> )*");
         }
     }
 }
